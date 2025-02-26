@@ -13,7 +13,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 
-public class P2PNode {
+public class Server {
 
     private String nodeIP;
     private ArrayList<Node> knownNodes;
@@ -23,7 +23,7 @@ public class P2PNode {
     private byte version;
     private static String myIP;
 
-    public P2PNode(String nodeIP) {
+    public Server(String nodeIP) {
         this.knownNodes = new ArrayList<>();
         this.secureRandom = new SecureRandom();
         this.scheduler = Executors.newScheduledThreadPool(1);
@@ -178,7 +178,7 @@ public class P2PNode {
         }catch (UnknownHostException e) {
             System.out.println("Could not determine local IP address: " + e.getMessage());
         }
-        P2PNode thisPC = new P2PNode(myIP);
+        Server thisPC = new Server(myIP);
         thisPC.loadKnownNodes();
         thisPC.listenForHeartbeat();
         thisPC.startHeartbeatTimer();

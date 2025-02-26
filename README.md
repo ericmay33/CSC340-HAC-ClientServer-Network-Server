@@ -1,1 +1,1 @@
-# CSC340-HAC-ClientServer-Network-Server
+# CSC340-HAC-ClientServer-Network

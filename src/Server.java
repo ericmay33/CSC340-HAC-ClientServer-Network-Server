@@ -1,7 +1,6 @@
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -12,20 +11,21 @@ import java.io.FileReader;
 import java.io.IOException;
 
 public class Server {
-
     private String serverIP;
     private final int serverPort = 5000;
     private Map<String, Node> knownClients;
+    private Map<String, Message> clientStatus;
     private ScheduledExecutorService scheduler;
 
-    public Server(int serverPort) {
+    public Server() {
         try {
             this.serverIP = InetAddress.getLocalHost().getHostAddress();
         } catch (Exception e) {
             this.serverIP = "127.0.0.1";
             System.out.println("Could not determine server IP: " + e.getMessage());
         }
-        this.knownClients = new HashMap<>();
+        this.knownClients = new HashMap<>(); // List of clients
+        this.clientStatus = new HashMap<>(); // For storing client messages
         this.scheduler = Executors.newScheduledThreadPool(1);
         loadKnownClients();
     }
@@ -60,8 +60,11 @@ public class Server {
                     DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
                     socket.receive(incomingPacket);
                     Message receivedMessage = Message.decode(incomingPacket.getData());
-                    System.out.println("Received heartbeat from " + receivedMessage.getNodeIP() + " - Version: " + receivedMessage.getVersion() + ", Timestamp: " + receivedMessage.getTimestamp() + ", Files: " + receivedMessage.getFileListing());
-                    processClientHeartbeat(receivedMessage); // Placeholder for processing
+                    System.out.println("Received heartbeat from " + receivedMessage.getNodeIP() +
+                                      " - Version: " + receivedMessage.getVersion() +
+                                      ", Timestamp: " + receivedMessage.getTimestamp() +
+                                      ", Files: " + receivedMessage.getFileListing());
+                    processClientHeartbeat(receivedMessage); // Updates clientStatus
                 }
             } catch (Exception e) {
                 System.err.println("Error in listening thread: " + e.getMessage());
@@ -80,11 +83,28 @@ public class Server {
     private void sendClientUpdates() {
         try {
             DatagramSocket socket = new DatagramSocket();
-            // Placeholder data for now; will be processed later
-            String combinedData = "Placeholder for client availability and file listings";
-            Message update = new Message((byte) 0, serverIP, (int) (System.currentTimeMillis() / 1000), combinedData);
+            // Build a concatenated string with IP, availability, and file listings
+            StringBuilder combinedData = new StringBuilder();
+            long currentTime = System.currentTimeMillis() / 1000;
+            for (String clientIP : knownClients.keySet()) {
+                Message lastMessage = clientStatus.get(clientIP);
+                String status = (lastMessage != null && (currentTime - lastMessage.getTimestamp()) <= 30) 
+                                ? "up" : "down";
+                String files = (lastMessage != null) ? lastMessage.getFileListing() : "none";
+                String nodeEntry = clientIP + ":" + status + ":" + files;
+                combinedData.append(nodeEntry).append(";");
+            }
+
+            // Remove trailing semicolon if present
+            if (combinedData.length() > 0) {
+                combinedData.setLength(combinedData.length() - 1);
+            }
+            String updateData = combinedData.toString();
+
+            Message update = new Message((byte) 0, serverIP, (int) currentTime, updateData);
             byte[] byteMessage = update.getMessageBytes();
 
+            // Send to all clients in knownClients
             for (Node client : knownClients.values()) {
                 InetAddress clientAddress = InetAddress.getByName(client.getIP());
                 DatagramPacket packet = new DatagramPacket(byteMessage, byteMessage.length, 
@@ -99,11 +119,14 @@ public class Server {
     }
 
     public void processClientHeartbeat(Message message) {
-        
+        Message currentMessage = clientStatus.get(message.getNodeIP());
+        if (currentMessage == null || message.getVersion() > currentMessage.getVersion()) {
+            clientStatus.put(message.getNodeIP(), message);
+        }
     }
 
     public static void main(String[] args) {
-        Server server = new Server(0);
+        Server server = new Server();
         server.startListening();
         server.startUpdateTimer();
     }

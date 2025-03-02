@@ -12,7 +12,7 @@ import java.io.IOException;
 
 public class Server {
     private String serverIP;
-    private final int serverPort = 5000;
+    private int serverPort; // From config
     private Map<String, Node> knownClients;
     private Map<String, Message> clientStatus;
     private ScheduledExecutorService scheduler;
@@ -21,11 +21,10 @@ public class Server {
         try {
             this.serverIP = InetAddress.getLocalHost().getHostAddress();
         } catch (Exception e) {
-            this.serverIP = "127.0.0.1";
-            System.out.println("Could not determine server IP: " + e.getMessage());
+            throw new RuntimeException("Could not determine server IP: " + e.getMessage());
         }
-        this.knownClients = new HashMap<>(); // List of clients
-        this.clientStatus = new HashMap<>(); // For storing client messages
+        this.knownClients = new HashMap<>();
+        this.clientStatus = new HashMap<>();
         this.scheduler = Executors.newScheduledThreadPool(1);
         loadKnownClients();
     }
@@ -34,18 +33,34 @@ public class Server {
         String configFile = ".config";
         try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
             String line;
+            boolean firstLine = true;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (!line.isEmpty()) {
                     String[] parts = line.split(":");
                     String ip = parts[0];
                     int port = Integer.parseInt(parts[1]);
-                    knownClients.put(ip, new Node(ip, port));
-                    System.out.println("Added client: " + ip + ":" + port);
+                    if (firstLine) {
+                        // First line is server's own address
+                        if (ip.equals(serverIP)) {
+                            this.serverPort = port;
+                        } else {
+                            throw new IOException("First line must be server's IP: " + serverIP);
+                        }
+                        firstLine = false;
+                    } else {
+                        // Remaining lines are clients
+                        knownClients.put(ip, new Node(ip, port));
+                        System.out.println("Added client: " + ip + ":" + port);
+                    }
                 }
             }
+            if (serverPort == 0) {
+                throw new IOException("Server port not found in config for " + serverIP);
+            }
+            System.out.println("Server configured on " + serverIP + ":" + serverPort);
         } catch (IOException e) {
-            System.out.println("Error reading server config: " + e.getMessage());
+            throw new RuntimeException("Error reading server config: " + e.getMessage());
         }
     }
 
@@ -64,7 +79,7 @@ public class Server {
                                       " - Version: " + receivedMessage.getVersion() +
                                       ", Timestamp: " + receivedMessage.getTimestamp() +
                                       ", Files: " + receivedMessage.getFileListing());
-                    processClientHeartbeat(receivedMessage); // Updates clientStatus
+                    processClientHeartbeat(receivedMessage);
                 }
             } catch (Exception e) {
                 System.err.println("Error in listening thread: " + e.getMessage());
@@ -83,7 +98,6 @@ public class Server {
     private void sendClientUpdates() {
         try {
             DatagramSocket socket = new DatagramSocket();
-            // Build a concatenated string with IP, availability, and file listings
             StringBuilder combinedData = new StringBuilder();
             long currentTime = System.currentTimeMillis() / 1000;
             for (String clientIP : knownClients.keySet()) {
@@ -94,8 +108,6 @@ public class Server {
                 String nodeEntry = clientIP + ":" + status + ":" + files;
                 combinedData.append(nodeEntry).append(";");
             }
-
-            // Remove trailing semicolon if present
             if (combinedData.length() > 0) {
                 combinedData.setLength(combinedData.length() - 1);
             }
@@ -104,7 +116,6 @@ public class Server {
             Message update = new Message((byte) 0, serverIP, (int) currentTime, updateData);
             byte[] byteMessage = update.getMessageBytes();
 
-            // Send to all clients in knownClients
             for (Node client : knownClients.values()) {
                 InetAddress clientAddress = InetAddress.getByName(client.getIP());
                 DatagramPacket packet = new DatagramPacket(byteMessage, byteMessage.length, 
@@ -119,10 +130,7 @@ public class Server {
     }
 
     public void processClientHeartbeat(Message message) {
-        Message currentMessage = clientStatus.get(message.getNodeIP());
-        if (currentMessage == null || message.getVersion() > currentMessage.getVersion()) {
-            clientStatus.put(message.getNodeIP(), message);
-        }
+        clientStatus.put(message.getNodeIP(), message);
     }
 
     public static void main(String[] args) {

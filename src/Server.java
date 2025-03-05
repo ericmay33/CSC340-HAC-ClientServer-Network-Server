@@ -1,3 +1,6 @@
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -6,9 +9,6 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
 
 public class Server {
     private String serverIP;
@@ -51,14 +51,14 @@ public class Server {
                     } else {
                         // Remaining lines are clients
                         knownClients.put(ip, new Node(ip, port));
-                        System.out.println("Added client: " + ip + ":" + port);
+                        //System.out.println("\n  ---------------------------------  \n| Added client: " + ip + ":" + port + " |\n  ---------------------------------");
                     }
                 }
             }
             if (serverPort == 0) {
                 throw new IOException("Server port not found in config for " + serverIP);
             }
-            System.out.println("Server configured on " + serverIP + ":" + serverPort);
+            //System.out.println("\n  ----------------------------------------  \n| Server configured on " + serverIP + ":" + serverPort + " |\n  ----------------------------------------");
         } catch (IOException e) {
             throw new RuntimeException("Error reading server config: " + e.getMessage());
         }
@@ -70,15 +70,15 @@ public class Server {
                 DatagramSocket socket = new DatagramSocket(serverPort);
                 byte[] incomingData = new byte[5120];
 
-                System.out.println("Server listening on " + serverIP + ":" + serverPort + "...");
+                //System.out.println("\n  ------------------------------------------  \n| Server listening on " + serverIP + ":" + serverPort + "... |\n  ------------------------------------------");
                 while (true) {
                     DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
                     socket.receive(incomingPacket);
                     Message receivedMessage = Message.decode(incomingPacket.getData());
-                    System.out.println("Received heartbeat from " + receivedMessage.getNodeIP() +
+                    System.out.println("\n-=<{ Received heartbeat from " + receivedMessage.getNodeIP() +
                                       " - Version: " + receivedMessage.getVersion() +
                                       ", Timestamp: " + receivedMessage.getTimestamp() +
-                                      ", Files: " + receivedMessage.getFileListing());
+                                      ", Files: " + receivedMessage.getFileListing() + " }>=-");
                     processClientHeartbeat(receivedMessage);
                 }
             } catch (Exception e) {
@@ -121,7 +121,7 @@ public class Server {
                 DatagramPacket packet = new DatagramPacket(byteMessage, byteMessage.length, 
                                                           clientAddress, client.getPort());
                 socket.send(packet);
-                System.out.println("Sent update to " + client.getIP() + ":" + client.getPort());
+                System.out.println("\n  ----------------------------------  \n| Sent update to " + client.getIP() + ":" + client.getPort() + " |\n  ----------------------------------  ");
             }
             socket.close();
         } catch (Exception e) {

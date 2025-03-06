@@ -75,10 +75,10 @@ public class Server {
                     DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
                     socket.receive(incomingPacket);
                     Message receivedMessage = Message.decode(incomingPacket.getData());
-                    System.out.println("\n-=<{ Received heartbeat from " + receivedMessage.getNodeIP() +
-                                      " - Version: " + receivedMessage.getVersion() +
-                                      ", Timestamp: " + receivedMessage.getTimestamp() +
-                                      ", Files: " + receivedMessage.getFileListing() + " }>=-");
+                    //System.out.println("\n-=<{ Received heartbeat from " + receivedMessage.getNodeIP() +
+                    //                  " - Version: " + receivedMessage.getVersion() +
+                    //                  ", Timestamp: " + receivedMessage.getTimestamp() +
+                    //                  ", Files: " + receivedMessage.getFileListing() + " }>=-");
                     processClientHeartbeat(receivedMessage);
                 }
             } catch (Exception e) {
